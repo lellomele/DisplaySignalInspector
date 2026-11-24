@@ -1,6 +1,6 @@
 #include <windows.h>
-#include "resource.h"
 #pragma code_page(65001)
+#include "resource.h"
 
 1 RT_MANIFEST "app.manifest"
 IDI_APP ICON "assets/schermo.ico"
@@ -8,7 +8,7 @@ IDI_APP ICON "assets/schermo.ico"
 IDD_MAIN DIALOGEX 0, 0, 332, 179
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 EXSTYLE WS_EX_APPWINDOW
-CAPTION "Display Signal Inspector"
+CAPTION APP_TITLE
 FONT 9, "Segoe UI"
 BEGIN
     LTEXT           "Schermo &esterno", -1, 12, 12, 100, 11
@@ -19,7 +19,7 @@ BEGIN
     LTEXT           "Segnale attivo", -1, 12, 64, 62, 10
     LTEXT           "", IDC_SIGNAL, 76, 64, 244, 10, SS_NOPREFIX
     LTEXT           "&Nuovo segnale", -1, 12, 84, 74, 11
-    COMBOBOX        IDC_PRESET, 86, 81, 234, 93, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_PRESET, 86, 81, 234, 93, CBS_OWNERDRAWFIXED | CBS_HASSTRINGS | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     PUSHBUTTON      "&Scansiona modalità", IDC_SCAN, 12, 104, 105, 17
     PUSHBUTTON      "&Verifica", IDC_VALIDATE, 190, 104, 62, 17
     PUSHBUTTON      "&Prova", IDC_TRY, 258, 104, 62, 17

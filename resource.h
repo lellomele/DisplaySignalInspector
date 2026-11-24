@@ -13,3 +13,5 @@
 #define IDC_STATUS    1008
 #define IDC_KEEP      1009
 #define IDC_RESTORE   1010
+
+#define APP_TITLE L"Display Signal Inspector \x00b7 \x00a9 2026 Prof. ing. Raffaele Mele"

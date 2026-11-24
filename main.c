@@ -15,6 +15,8 @@ typedef struct {
     ULONGLONG trial_start;
     bool trial;
     bool verified;
+    bool validated[PRESET_COUNT];
+    HFONT preset_bold;
 } App;
 
 static void status(App *app, const wchar_t *message)
@@ -79,8 +81,15 @@ static void show_path(App *app, const DisplayConfig *config, const DISPLAYCONFIG
     SetDlgItemTextW(app->dialog, IDC_SIGNAL, signal);
 }
 
+static void clear_validation(App *app)
+{
+    memset(app->validated, 0, sizeof(app->validated));
+    InvalidateRect(GetDlgItem(app->dialog, IDC_PRESET), NULL, TRUE);
+}
+
 static void reload(App *app, bool report)
 {
+    clear_validation(app);
     const DISPLAYCONFIG_PATH_INFO *old = selected_path(app);
     bool had_selection = old != NULL;
     DisplayKey previous = old ? display_key(old) : (DisplayKey){0};
@@ -132,32 +141,37 @@ static void reload(App *app, bool report)
         status(app, L"Verifica controlla la modalità senza cambiare lo schermo.");
 }
 
+static void draw_mode(const DRAWITEMSTRUCT *row, bool combo, HFONT bold)
+{
+    BOOL selected = (row->itemState & ODS_SELECTED) != 0;
+    FillRect(row->hDC, &row->rcItem, GetSysColorBrush(selected ? COLOR_HIGHLIGHT : COLOR_WINDOW));
+    if (row->itemID != (UINT)-1) {
+        wchar_t text[256];
+        LRESULT length = SendMessageW(row->hwndItem, combo ? CB_GETLBTEXTLEN : LB_GETTEXTLEN, row->itemID, 0);
+        if (length >= 0 && (size_t)length < ARRAYSIZE(text) &&
+            SendMessageW(row->hwndItem, combo ? CB_GETLBTEXT : LB_GETTEXT, row->itemID, (LPARAM)text) != LB_ERR) {
+            HFONT font = bold;
+            if (!font) font = (HFONT)SendMessageW(row->hwndItem, WM_GETFONT, 0, 0);
+            int saved = SaveDC(row->hDC);
+            if (saved) {
+                if (font) SelectObject(row->hDC, font);
+                SetTextColor(row->hDC, GetSysColor(selected ? COLOR_HIGHLIGHTTEXT : COLOR_WINDOWTEXT));
+                SetBkMode(row->hDC, TRANSPARENT);
+                RECT area = row->rcItem;
+                area.left += 3;
+                DrawTextW(row->hDC, text, -1, &area, DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
+                RestoreDC(row->hDC, saved);
+            }
+        }
+    }
+    if (row->itemState & ODS_FOCUS) DrawFocusRect(row->hDC, &row->rcItem);
+}
+
 static INT_PTR CALLBACK scan_dialog(HWND dialog, UINT message, WPARAM wp, LPARAM lp)
 {
     if (message == WM_DRAWITEM && wp == IDC_RESULTS) {
         const DRAWITEMSTRUCT *row = (const DRAWITEMSTRUCT *)lp;
-        BOOL selected = (row->itemState & ODS_SELECTED) != 0;
-        FillRect(row->hDC, &row->rcItem, GetSysColorBrush(selected ? COLOR_HIGHLIGHT : COLOR_WINDOW));
-        if (row->itemID != (UINT)-1) {
-            wchar_t text[256];
-            LRESULT length = SendMessageW(row->hwndItem, LB_GETTEXTLEN, row->itemID, 0);
-            if (length >= 0 && (size_t)length < ARRAYSIZE(text) &&
-                SendMessageW(row->hwndItem, LB_GETTEXT, row->itemID, (LPARAM)text) != LB_ERR) {
-                HFONT font = row->itemData ? (HFONT)GetWindowLongPtrW(dialog, DWLP_USER) : NULL;
-                if (!font) font = (HFONT)SendMessageW(row->hwndItem, WM_GETFONT, 0, 0);
-                int saved = SaveDC(row->hDC);
-                if (saved) {
-                    if (font) SelectObject(row->hDC, font);
-                    SetTextColor(row->hDC, GetSysColor(selected ? COLOR_HIGHLIGHTTEXT : COLOR_WINDOWTEXT));
-                    SetBkMode(row->hDC, TRANSPARENT);
-                    RECT area = row->rcItem;
-                    area.left += 3;
-                    DrawTextW(row->hDC, text, -1, &area, DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
-                    RestoreDC(row->hDC, saved);
-                }
-            }
-        }
-        if (row->itemState & ODS_FOCUS) DrawFocusRect(row->hDC, &row->rcItem);
+        draw_mode(row, false, row->itemData ? (HFONT)GetWindowLongPtrW(dialog, DWLP_USER) : NULL);
         return TRUE;
     }
     if (message == WM_DESTROY) {
@@ -169,7 +183,8 @@ static INT_PTR CALLBACK scan_dialog(HWND dialog, UINT message, WPARAM wp, LPARAM
         return TRUE;
     }
     if (message != WM_INITDIALOG) return FALSE;
-    DisplayKey key = *(const DisplayKey *)lp;
+    App *app = (App *)lp;
+    DisplayKey key = display_key(selected_path(app));
     DisplayConfig config = {0};
     HWND list = GetDlgItem(dialog, IDC_RESULTS);
     LOGFONTW style;
@@ -202,6 +217,7 @@ static INT_PTR CALLBACK scan_dialog(HWND dialog, UINT message, WPARAM wp, LPARAM
             DisplayConfig request = {0};
             bool active = display_matches(display_signal(&config, path), &display_presets[i]);
             LONG code = active ? ERROR_SUCCESS : display_prepare(&config, key, i, &request);
+            app->validated[i] = code == ERROR_SUCCESS;
             if (code == ERROR_SUCCESS)
                 swprintf(line, ARRAYSIZE(line), L"%ls | EDID: %ls | %ls", display_presets[i].label, edid_status(edid,blocks,&display_presets[i]), active ? L"attivo" : L"validato");
             else
@@ -412,17 +428,33 @@ static INT_PTR CALLBACK dialog_proc(HWND dialog, UINT message, WPARAM wparam, LP
                                           LR_SHARED);
         SendMessageW(dialog, WM_SETICON, ICON_BIG, (LPARAM)large);
         SendMessageW(dialog, WM_SETICON, ICON_SMALL, (LPARAM)small);
+        LOGFONTW style;
+        HFONT normal = (HFONT)SendDlgItemMessageW(dialog, IDC_PRESET, WM_GETFONT, 0, 0);
+        if (GetObjectW(normal, sizeof(style), &style) == sizeof(style)) {
+            style.lfWeight = FW_BOLD;
+            app->preset_bold = CreateFontIndirectW(&style);
+            SendDlgItemMessageW(dialog, IDC_PRESET, CB_SETITEMHEIGHT, 0, abs(style.lfHeight)+5);
+        }
         for (unsigned i = 0; i < PRESET_COUNT; ++i)
             SendDlgItemMessageW(dialog, IDC_PRESET, CB_ADDSTRING, 0, (LPARAM)display_presets[i].label);
         SendDlgItemMessageW(dialog, IDC_PRESET, CB_SETCURSEL, PRESET_QHD, 0);
         reload(app, true);
         return TRUE;
     }
+    case WM_DRAWITEM:
+        if (wparam == IDC_PRESET && app) {
+            const DRAWITEMSTRUCT *row = (const DRAWITEMSTRUCT *)lparam;
+            HFONT bold = row->itemID < PRESET_COUNT && app->validated[row->itemID] ? app->preset_bold : NULL;
+            draw_mode(row, true, bold);
+            return TRUE;
+        }
+        break;
     case WM_COMMAND:
         switch (LOWORD(wparam)) {
         case IDC_MONITOR:
             if (HIWORD(wparam) != CBN_SELCHANGE || app->trial)
                 return FALSE;
+            clear_validation(app);
             show_path(app, &app->current, selected_path(app));
             status(app, L"Seleziona il nuovo segnale, poi premi Verifica o Prova.");
             return TRUE;
@@ -430,8 +462,9 @@ static INT_PTR CALLBACK dialog_proc(HWND dialog, UINT message, WPARAM wparam, LP
         case IDC_SCAN: {
             const DISPLAYCONFIG_PATH_INFO *path = selected_path(app);
             if (path && !app->trial) {
-                DisplayKey key = display_key(path);
-                DialogBoxParamW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDD_SCAN), dialog, scan_dialog, (LPARAM)&key);
+                clear_validation(app);
+                DialogBoxParamW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDD_SCAN), dialog, scan_dialog, (LPARAM)app);
+                InvalidateRect(GetDlgItem(dialog, IDC_PRESET), NULL, TRUE);
             }
             return TRUE;
         }
@@ -480,7 +513,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command, int s
     if (!single)
         return 1;
     if (GetLastError() == ERROR_ALREADY_EXISTS) {
-        HWND existing = FindWindowW(MAKEINTATOM(32770), L"Segnale Schermo");
+        HWND existing = FindWindowW(MAKEINTATOM(32770), APP_TITLE);
+        if (!existing) existing = FindWindowW(MAKEINTATOM(32770), L"Display Signal Inspector");
+        if (!existing) existing = FindWindowW(MAKEINTATOM(32770), L"Segnale Schermo");
         if (existing) {
             ShowWindow(existing, SW_RESTORE);
             SetForegroundWindow(existing);
@@ -490,6 +525,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command, int s
     }
     App app = {0};
     INT_PTR result = DialogBoxParamW(instance, MAKEINTRESOURCEW(IDD_MAIN), NULL, dialog_proc, (LPARAM)&app);
+    DeleteObject(app.preset_bold);
     display_free(&app.current);
     display_free(&app.before);
     display_free(&app.request);

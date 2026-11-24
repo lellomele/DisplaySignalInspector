@@ -1,0 +1,15 @@
+#define IDI_APP        101
+#define IDC_SCAN 1011
+#define IDD_SCAN 103
+#define IDC_RESULTS 1012
+#define IDD_MAIN       102
+#define IDC_MONITOR   1001
+#define IDC_REFRESH   1002
+#define IDC_DESKTOP   1003
+#define IDC_SIGNAL    1004
+#define IDC_PRESET    1005
+#define IDC_VALIDATE  1006
+#define IDC_TRY       1007
+#define IDC_STATUS    1008
+#define IDC_KEEP      1009
+#define IDC_RESTORE   1010

@@ -1,0 +1,38 @@
+#include <windows.h>
+#include "resource.h"
+#pragma code_page(65001)
+
+1 RT_MANIFEST "app.manifest"
+IDI_APP ICON "assets/schermo.ico"
+
+IDD_MAIN DIALOGEX 0, 0, 332, 179
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "Display Signal Inspector"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT           "Schermo &esterno", -1, 12, 12, 100, 11
+    COMBOBOX        IDC_MONITOR, 12, 25, 238, 110, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Aggiorna", IDC_REFRESH, 254, 24, 66, 16
+    LTEXT           "Desktop", -1, 12, 49, 56, 10
+    LTEXT           "", IDC_DESKTOP, 76, 49, 244, 10, SS_NOPREFIX
+    LTEXT           "Segnale attivo", -1, 12, 64, 62, 10
+    LTEXT           "", IDC_SIGNAL, 76, 64, 244, 10, SS_NOPREFIX
+    LTEXT           "&Nuovo segnale", -1, 12, 84, 74, 11
+    COMBOBOX        IDC_PRESET, 86, 81, 234, 93, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Scansiona modalità", IDC_SCAN, 12, 104, 105, 17
+    PUSHBUTTON      "&Verifica", IDC_VALIDATE, 190, 104, 62, 17
+    PUSHBUTTON      "&Prova", IDC_TRY, 258, 104, 62, 17
+    LTEXT           "", IDC_STATUS, 12, 128, 308, 23, SS_NOPREFIX
+    PUSHBUTTON      "&Ripristina", IDC_RESTORE, 174, 151, 70, 17
+    PUSHBUTTON      "&Conferma", IDC_KEEP, 250, 151, 70, 17
+END
+
+IDD_SCAN DIALOGEX 0, 0, 390, 210
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Modalità dello schermo"
+FONT 9, "Segoe UI"
+BEGIN
+    LISTBOX IDC_RESULTS, 8, 8, 374, 170, WS_VSCROLL | WS_TABSTOP | LBS_NOINTEGRALHEIGHT | LBS_OWNERDRAWFIXED | LBS_HASSTRINGS
+    DEFPUSHBUTTON "Chiudi", IDOK, 318, 185, 64, 17
+END
